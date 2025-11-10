@@ -34,7 +34,8 @@
   </div>
 
 <script>
-const API_URL = 'https://jade-proxy.onrender.com/api/predict';
+// PONTO DE MUDANÇA 1: A URL agora aponta para o endpoint /chat do seu proxy.
+const API_URL = 'https://jade-proxy.onrender.com/chat';
 const chatbox = document.getElementById('chatbox');
 const userInput = document.getElementById('userInput');
 const sendBtn = document.getElementById('sendBtn');
@@ -47,7 +48,10 @@ function appendMessage(sender, text){
   chatbox.appendChild(el);
   chatbox.scrollTop = chatbox.scrollHeight;
 }
-function escapeHtml(s){ return s.replace(/[&<>"']/g, ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[ch])); }
+
+function escapeHtml(s){ 
+  return s.replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[ch])); 
+}
 
 async function sendMessage(message){
   appendMessage('Você', message);
@@ -56,22 +60,25 @@ async function sendMessage(message){
     const resp = await fetch(API_URL, {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ data: [message, null, null, [] ], fn_index: 0 })
+      // PONTO DE MUDANÇA 2: O corpo da requisição é um JSON simples,
+      // exatamente como o nosso backend FastAPI espera.
+      body: JSON.stringify({ user_input: message })
     });
+
     if (!resp.ok) throw new Error('HTTP '+resp.status);
     const json = await resp.json();
-    // tenta extrair de forma segura
-    let bot = null;
-    if (json?.data && Array.isArray(json.data) && json.data[0]) {
-      const hist = json.data[0];
-      if (Array.isArray(hist) && hist.length>0) {
-        const last = hist[hist.length-1];
-        bot = Array.isArray(last) ? last[1] : String(last);
-      } else if (typeof hist === 'string') bot = hist;
+
+    // PONTO DE MUDANÇA 3: A extração da resposta é limpa e direta.
+    // Não precisamos mais adivinhar a estrutura complexa do Gradio.
+    let botResponse = "[Resposta em formato inesperado]";
+    if (json.success && json.bot_response) {
+      botResponse = json.bot_response;
+    } else if (json.error) {
+      botResponse = `[Erro na API J.A.D.E.: ${json.error}]`;
     }
-    if (!bot && typeof json === 'string') bot = json;
-    if (!bot) bot = '[Resposta em formato inesperado]';
-    appendMessage('J.A.D.E.', bot);
+    
+    appendMessage('J.A.D.E.', botResponse);
+
   } catch (err) {
     console.error(err);
     appendMessage('Erro do Sistema', 'Falha ao conectar com J.A.D.E.');
@@ -79,8 +86,7 @@ async function sendMessage(message){
 }
 
 sendBtn.addEventListener('click', ()=>{ const m=userInput.value.trim(); if(m) sendMessage(m); });
-userInput.addEventListener('keydown', e=>{ if(e.key==='Enter'){ const m=userInput.value.trim(); if(m) sendMessage(m); }});
+userInput.addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); const m=userInput.value.trim(); if(m) sendMessage(m); }});
 </script>
 </body>
 </html>
-
