@@ -5,21 +5,184 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>J.A.D.E. - Portfólio Interativo</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap');
-    :root { --bg:#0d1117; --surface:#161b22; --primary:#58a6ff; --text:#c9d1d9; --border:#30363d; }
-    body{font-family:'Fira+Code',monospace;background:var(--bg);color:var(--text);margin:0;display:flex;justify-content:center;align-items:center;height:100vh}
-    #chat-container{width:90%;max-width:720px;height:80vh;background:var(--surface);border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;box-shadow:0 8px 24px rgba(0,0,0,.45)}
-    #chat-header{padding:1rem;border-bottom:1px solid var(--border);font-weight:700;text-align:center}
-    #chatbox{flex:1;padding:1rem;overflow-y:auto}
-    .message{margin-bottom:1rem;display:flex;flex-direction:column}
-    .sender{font-size:.78rem;color:#8b949e;margin-bottom:.25rem}
-    .sender.user{color:var(--primary);align-self:flex-end}
-    .text{background:var(--bg);padding:.75rem;border-radius:6px;max-width:80%;word-wrap:break-word}
-    .user .text{background:#212c42;align-self:flex-end}
-    #input-area{display:flex;padding:1rem;border-top:1px solid var(--border);align-items:center}
-    #userInput{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:.75rem;color:var(--text);font-family:inherit}
-    button{margin-left:10px;background:var(--primary);color:#042033;border:none;border-radius:6px;padding:0 .9rem;cursor:pointer;font-weight:700;height:40px;font-size:1.1rem;line-height:40px}
-    #sendBtn{padding:0 1.2rem}
+    /* FONTES E CONFIGURAÇÕES GERAIS */
+    @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&family=Inter:wght@400;500&display=swap');
+    
+    :root { 
+      --bg: #0d1117; 
+      --surface: #161b22; 
+      --primary: #58a6ff; 
+      --primary-hover: #79c0ff;
+      --text: #c9d1d9; 
+      --border: #30363d; 
+      --shadow: rgba(0,0,0,.45);
+      --font-body: 'Inter', sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    body {
+      font-family: var(--font-body);
+      background-image: radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0);
+      background-size: 25px 25px;
+      background-color: var(--bg);
+      color: var(--text);
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* CONTAINER PRINCIPAL */
+    #chat-container {
+      width: 90%;
+      max-width: 800px; /* Um pouco maior */
+      height: 90vh; /* Um pouco mais alto */
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px; /* Bordas mais suaves */
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 12px 32px var(--shadow);
+      backdrop-filter: blur(10px);
+      transition: all 0.3s ease;
+    }
+
+    /* CABEÇALHO */
+    #chat-header {
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-weight: 700;
+      text-align: center;
+      color: var(--primary);
+    }
+    #chat-header span {
+      opacity: 0.6;
+    }
+
+    /* ÁREA DE MENSAGENS */
+    #chatbox {
+      flex: 1;
+      padding: 1.5rem;
+      overflow-y: auto;
+      scroll-behavior: smooth;
+    }
+    /* Estilo da barra de rolagem */
+    #chatbox::-webkit-scrollbar { width: 6px; }
+    #chatbox::-webkit-scrollbar-track { background: transparent; }
+    #chatbox::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* MENSAGENS */
+    .message {
+      margin-bottom: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      max-width: 85%;
+    }
+    .sender {
+      font-size: 0.8rem;
+      color: #8b949e;
+      margin-bottom: 0.3rem;
+      font-weight: 500;
+    }
+    .text {
+      background: var(--bg);
+      padding: 0.8rem 1rem;
+      border-radius: 10px;
+      line-height: 1.6;
+      word-wrap: break-word;
+    }
+    
+    /* Mensagens do Usuário */
+    .message.user { align-self: flex-end; }
+    .sender.user { color: var(--primary); align-self: flex-end; }
+    .user .text { background: #1f2a40; }
+
+    /* ANIMAÇÃO DE FADE-IN PARA NOVAS MENSAGENS */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(15px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .message.new-message {
+      animation: fadeIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    /* INDICADOR DE "DIGITANDO..." */
+    .typing-indicator span {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--primary);
+      margin: 0 2px;
+      animation: typing-dots 1.4s infinite ease-in-out both;
+    }
+    .typing-indicator span:nth-child(2) { animation-delay: .2s; }
+    .typing-indicator span:nth-child(3) { animation-delay: .4s; }
+
+    @keyframes typing-dots {
+      0%, 80%, 100% { transform: scale(0); }
+      40% { transform: scale(1.0); }
+    }
+
+    /* ÁREA DE INPUT */
+    #input-area {
+      display: flex;
+      padding: 1rem 1.5rem;
+      border-top: 1px solid var(--border);
+      align-items: center;
+      gap: 10px;
+    }
+    #userInput {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.8rem 1rem;
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 1rem;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    #userInput:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.2);
+    }
+
+    button {
+      background: transparent;
+      color: var(--primary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0;
+      width: 44px;
+      height: 44px;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 1.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    }
+    button:hover {
+      background-color: var(--primary);
+      color: var(--bg);
+      border-color: var(--primary);
+    }
+    #sendBtn {
+      background-color: var(--primary);
+      color: var(--bg);
+      border-color: var(--primary);
+    }
+    #sendBtn:hover {
+      background-color: var(--primary-hover);
+      border-color: var(--primary-hover);
+    }
+
   </style>
 </head>
 <body>
@@ -32,7 +195,10 @@
       <input type="file" id="imageInput" accept="image/*" style="display: none;">
       <button id="imageBtn" title="Enviar Imagem">🖼️</button>
       <input id="userInput" placeholder="Digite sua mensagem..." autocomplete="off"/>
-      <button id="sendBtn">Enviar</button>
+      <button id="sendBtn" title="Enviar">
+        <!-- Ícone de Enviar SVG -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+      </button>
     </div>
   </div>
   <audio id="audioPlayer" style="display: none;"></audio>
@@ -49,14 +215,26 @@ const audioPlayer = document.getElementById('audioPlayer');
 imageBtn.addEventListener('click', () => imageInput.click());
 imageInput.addEventListener('change', () => { if (imageInput.files.length > 0) { appendMessage('Sistema', `Imagem "${imageInput.files[0].name}" selecionada.`); }});
 
-function appendMessage(sender, text){
+function appendMessage(sender, textContent, isTyping = false){
   const senderClass = sender === 'Você' ? 'user' : 'bot';
   const el = document.createElement('div');
-  el.className = `message ${senderClass}`;
-  el.innerHTML = `<div class="sender ${senderClass}">${sender}</div><div class="text">${escapeHtml(text)}</div>`;
+  el.className = `message ${senderClass} new-message`; // Adiciona classe para animação
+  
+  let innerHTML;
+  if (isTyping) {
+    innerHTML = `<div class="sender">${sender}</div><div class="text"><div class="typing-indicator"><span></span><span></span><span></span></div></div>`;
+  } else {
+    innerHTML = `<div class="sender ${senderClass}">${sender}</div><div class="text">${escapeHtml(textContent)}</div>`;
+  }
+  
+  el.innerHTML = innerHTML;
   chatbox.appendChild(el);
   chatbox.scrollTop = chatbox.scrollHeight;
+
+  setTimeout(() => el.classList.remove('new-message'), 400);
+  return el; // Retorna o elemento para podermos atualizá-lo
 }
+
 function escapeHtml(s){ return s.replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[ch])); }
 function fileToBase64(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result); reader.onerror = error => reject(error); }); }
 
@@ -64,36 +242,45 @@ async function sendMessage(){
   const message = userInput.value.trim();
   let image_base64 = null;
   if (!message && imageInput.files.length === 0) return;
-  if (imageInput.files.length > 0) { appendMessage('Você', `${message || ''} [Imagem Anexada]`); image_base64 = await fileToBase64(imageInput.files[0]); imageInput.value = ''; } else { appendMessage('Você', message); }
+  
+  if (imageInput.files.length > 0) { 
+    appendMessage('Você', `${message || ''} [Imagem Anexada]`); 
+    image_base64 = await fileToBase64(imageInput.files[0]); 
+    imageInput.value = ''; 
+  } else { 
+    appendMessage('Você', message); 
+  }
   userInput.value = '';
 
   try {
-    appendMessage('J.A.D.E.', 'Processando...');
-    const jadeThinkingMessage = chatbox.lastElementChild;
-    const resp = await fetch(API_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ user_input: message, image_base64: image_base64 }) });
+    const jadeTypingMessage = appendMessage('J.A.D.E.', '', true); // Mostra o indicador de "digitando"
+
+    const resp = await fetch(API_URL, { method:'POST', headers:{'Content-Type':'application-json'}, body: JSON.stringify({ user_input: message, image_base64: image_base64 }) });
     if (!resp.ok) throw new Error('HTTP '+resp.status);
     const json = await resp.json();
     
-    let botResponse; // Declarada sem valor inicial
+    let botResponse;
 
     if (json.success) {
-        botResponse = json.bot_response; // Pega o valor da API
+        botResponse = json.bot_response;
         if (json.audio_base64) {
             audioPlayer.src = `data:audio/mpeg;base64,${json.audio_base64}`;
             audioPlayer.play();
         }
     } else { botResponse = `[Erro: ${json.error || 'Desconhecido'}]`; }
     
-    // A SALVAGUARDA: Se botResponse for undefined, mostramos uma mensagem clara.
     if (botResponse === undefined) {
         botResponse = "[Erro de comunicação: O texto da resposta não foi encontrado.]";
     }
     
-    jadeThinkingMessage.querySelector('.text').innerHTML = escapeHtml(botResponse);
+    // Atualiza a mensagem de "digitando" com a resposta final
+    jadeTypingMessage.innerHTML = `<div class="sender">J.A.D.E.</div><div class="text">${escapeHtml(botResponse)}</div>`;
   } catch (err) {
     console.error(err);
-    const thinkingMsg = chatbox.querySelector('.message:last-child .text');
-    if(thinkingMsg && thinkingMsg.textContent === 'Processando...'){ thinkingMsg.parentElement.parentElement.innerHTML = `<div class="sender">Erro do Sistema</div><div class="text">Falha ao conectar com J.A.D.E.</div>`; }
+    const thinkingMsg = Array.from(chatbox.querySelectorAll('.message.bot')).pop();
+    if(thinkingMsg && thinkingMsg.querySelector('.typing-indicator')){
+      thinkingMsg.innerHTML = `<div class="sender">Erro do Sistema</div><div class="text">Falha ao conectar com J.A.D.E.</div>`;
+    }
   }
 }
 
