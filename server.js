@@ -9,19 +9,18 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-// endpoint do Space
-const HF_SPACE_URL = "https://madras1-jade-port.hf.space/run/predict";
+const HF_BASE = "https://madras1-jade-port.hf.space"; // base do space
 
-app.use(cors()); // habilita CORS global
-app.use(express.json());
+app.use(cors());
+app.use(express.json({ limit: '5mb' })); // aceita bodies maiores se necessário
 app.use(express.static(path.join(__dirname, "public")));
 
-// Rota GET para teste: abre essa URL no browser para confirmar que a rota existe
+// rota de debug simples
 app.get("/api/predict", (req, res) => {
-  return res.json({ status: "ok", message: "Endpoint /api/predict ativo - envie POST com JSON" });
+  res.json({ status: "ok", message: "Endpoint /api/predict ativo (GET test)" });
 });
 
-// Responde OPTIONS (CORS preflight) explicitamente
+// OPTIONS preflight
 app.options("/api/predict", (req, res) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -29,24 +28,69 @@ app.options("/api/predict", (req, res) => {
   return res.sendStatus(204);
 });
 
-// Endpoint POST que repassa ao HuggingFace Space
+// lista de paths a tentar (ordem: queue/join depois run/predict etc)
+const candidatePaths = [
+  "/queue/join",
+  "/run/predict",
+  "/api/predict",
+  "/predict"
+];
+
+async function tryForward(bodyText, origHeaders) {
+  // origHeaders: object with headers from client request (if needed)
+  for (const p of candidatePaths) {
+    const url = HF_BASE + p;
+    try {
+      console.log(`Tentando encaminhar para: ${url}`);
+      const hfResp = await fetch(url, {
+        method: "POST",
+        headers: {
+          // repassa Content-Type e aceita possivel Authorization se existir
+          "Content-Type": origHeaders["content-type"] || "application/json",
+          ...(origHeaders["authorization"] ? { "Authorization": origHeaders["authorization"] } : {})
+        },
+        body: bodyText,
+      });
+
+      const text = await hfResp.text();
+      console.log(`Resposta de ${p}: status=${hfResp.status} len=${String(text).length}`);
+
+      // Se não for 404, consideramos válido e retornamos
+      if (hfResp.status !== 404) {
+        return { ok: true, status: hfResp.status, text, headers: hfResp.headers };
+      } else {
+        // continua testando próximos
+        console.log(`${p} retornou 404, tentando próximo...`);
+      }
+    } catch (err) {
+      console.error(`Erro ao chamar ${url}:`, err.message || err);
+      // tenta próximo
+    }
+  }
+  return { ok: false, status: 404, text: JSON.stringify({ detail: "Not Found" }) };
+}
+
 app.post("/api/predict", async (req, res) => {
   try {
-    // console.log para investigação se necessário:
-    console.log("POST /api/predict recebido. Body keys:", Object.keys(req.body || {}));
+    const bodyText = JSON.stringify(req.body || {});
+    // pega alguns headers úteis do pedido do cliente (lowercase)
+    const incoming = {};
+    for (const [k, v] of Object.entries(req.headers || {})) incoming[k.toLowerCase()] = v;
 
-    const response = await fetch(HF_SPACE_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" /*, Authorization: `Bearer ${process.env.HF_TOKEN}` */ },
-      body: JSON.stringify(req.body),
-    });
+    console.log("POST /api/predict recebido. keys:", Object.keys(req.body || {}));
+    const result = await tryForward(bodyText, incoming);
 
-    const text = await response.text();
-    // repassa tal qual (status e body)
-    res.status(response.status).type("application/json").send(text);
+    if (result.ok) {
+      // repassa o conteúdo do HF Space
+      // tenta definir content-type igual ao que veio
+      const ctype = result.headers.get("content-type") || "application/json; charset=utf-8";
+      res.status(result.status).type(ctype).send(result.text);
+    } else {
+      res.status(404).json({ detail: "Not Found - nenhum endpoint do Space aceitou a requisição" });
+    }
   } catch (err) {
-    console.error("Erro ao chamar o Hugging Face:", err);
-    res.status(502).json({ error: "Falha na comunicação com o Space", details: err.message });
+    console.error("Erro interno no proxy:", err);
+    res.status(500).json({ error: "proxy_internal_error", details: String(err) });
   }
 });
 
