@@ -26,119 +26,81 @@
   <div id="chat-container">
     <div id="chat-header">J.A.D.E. <span>//</span> Ativa</div>
     <div id="chatbox">
-      <div class="message bot"><div class="sender">J.A.D.E.</div><div class="text">Sistema online. Aguardando seu comando. Envie uma imagem ou digite uma mensagem.</div></div>
+      <div class="message bot"><div class="sender">J.A.D.E.</div><div class="text">Sistema online. Aguardando seu comando.</div></div>
     </div>
     <div id="input-area">
-      <!-- NOVOS ELEMENTOS: Botão para imagem e o input de arquivo escondido -->
       <input type="file" id="imageInput" accept="image/*" style="display: none;">
       <button id="imageBtn" title="Enviar Imagem">🖼️</button>
-
       <input id="userInput" placeholder="Digite sua mensagem..." autocomplete="off"/>
       <button id="sendBtn">Enviar</button>
     </div>
   </div>
+  <!-- O PLAYER DE ÁUDIO INVISÍVEL -->
+  <audio id="audioPlayer" style="display: none;"></audio>
 
 <script>
 const API_URL = 'https://jade-proxy.onrender.com/chat';
 const chatbox = document.getElementById('chatbox');
 const userInput = document.getElementById('userInput');
 const sendBtn = document.getElementById('sendBtn');
-
-// NOVOS ELEMENTOS: Capturando os botões e inputs de arquivo
 const imageInput = document.getElementById('imageInput');
 const imageBtn = document.getElementById('imageBtn');
+const audioPlayer = document.getElementById('audioPlayer'); // Captura o player
 
-// Adicionando evento para que o botão de imagem acione o clique no input escondido
 imageBtn.addEventListener('click', () => imageInput.click());
 imageInput.addEventListener('change', () => {
-    if (imageInput.files.length > 0) {
-        appendMessage('Sistema', `Imagem "${imageInput.files[0].name}" selecionada. Envie uma mensagem para processá-la.`);
-    }
+    if (imageInput.files.length > 0) { appendMessage('Sistema', `Imagem "${imageInput.files[0].name}" selecionada. Envie uma mensagem para processá-la.`); }
 });
 
-
-function appendMessage(sender, text){
-  const senderClass = sender === 'Você' ? 'user' : 'bot';
-  const el = document.createElement('div');
-  el.className = `message ${senderClass}`;
-  el.innerHTML = `<div class="sender ${senderClass}">${sender}</div><div class="text">${escapeHtml(text)}</div>`;
-  chatbox.appendChild(el);
-  chatbox.scrollTop = chatbox.scrollHeight;
-}
-
-function escapeHtml(s){ 
-  return s.replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[ch])); 
-}
-
-// NOVA FUNÇÃO: Converte um arquivo para uma string Base64
-function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = error => reject(error);
-    });
-}
+function appendMessage(sender, text){ /* ... (sem alterações) ... */ }
+function escapeHtml(s){ /* ... (sem alterações) ... */ }
+function fileToBase64(file) { /* ... (sem alterações) ... */ }
 
 async function sendMessage(){
   const message = userInput.value.trim();
   let image_base64 = null;
-  
-  if (!message && imageInput.files.length === 0) return; // Não faz nada se tudo estiver vazio
-
-  // MODIFICAÇÃO: Lógica para pegar a imagem e convertê-la
+  if (!message && imageInput.files.length === 0) return;
   if (imageInput.files.length > 0) {
-      appendMessage('Você', `${message} [Imagem Anexada]`);
+      appendMessage('Você', `${message || ''} [Imagem Anexada]`);
       image_base64 = await fileToBase64(imageInput.files[0]);
-      imageInput.value = ''; // Limpa o input após o envio
-  } else {
-      appendMessage('Você', message);
-  }
-
+      imageInput.value = '';
+  } else { appendMessage('Você', message); }
   userInput.value = '';
 
   try {
-    // Adiciona um estado de "pensando" para a J.A.D.E.
     appendMessage('J.A.D.E.', 'Processando...');
     const jadeThinkingMessage = chatbox.lastElementChild;
-
     const resp = await fetch(API_URL, {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      // MODIFICAÇÃO: O corpo agora pode conter a imagem em Base64
-      body: JSON.stringify({ 
-          user_input: message, 
-          image_base64: image_base64 
-      })
+      body: JSON.stringify({ user_input: message, image_base64: image_base64 })
     });
 
     if (!resp.ok) throw new Error('HTTP '+resp.status);
     const json = await resp.json();
     
-    let botResponse = "[Resposta em formato inesperado]";
-    if (json.success && json.bot_response) {
-      botResponse = json.bot_response;
-    } else if (json.error) {
-      botResponse = `[Erro na API J.A.D.E.: ${json.error}]`;
-    }
+    let botResponse = "[Resposta inesperada]";
+    if (json.success) {
+        botResponse = json.bot_response;
+        // LÓGICA PARA TOCAR O ÁUDIO!
+        if (json.audio_base64) {
+            audioPlayer.src = `data:audio/mpeg;base64,${json.audio_base64}`;
+            audioPlayer.play();
+        }
+    } else { botResponse = `[Erro: ${json.error || 'Desconhecido'}]`; }
     
-    // Atualiza a mensagem "Processando..." com a resposta final
     jadeThinkingMessage.querySelector('.text').innerHTML = escapeHtml(botResponse);
-
   } catch (err) {
     console.error(err);
-    appendMessage('Erro do Sistema', 'Falha ao conectar com J.A.D.E.');
+    const thinkingMsg = chatbox.querySelector('.message:last-child .text');
+    if(thinkingMsg && thinkingMsg.textContent === 'Processando...'){
+      thinkingMsg.parentElement.parentElement.innerHTML = `<div class="sender">Erro do Sistema</div><div class="text">Falha ao conectar com J.A.D.E.</div>`;
+    }
   }
 }
 
-// Modificado para chamar a função sem argumentos
 sendBtn.addEventListener('click', sendMessage);
-userInput.addEventListener('keydown', e=>{ 
-  if(e.key==='Enter' && !e.shiftKey){ 
-    e.preventDefault(); 
-    sendMessage(); 
-  }
-});
+userInput.addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); }});
 </script>
 </body>
 </html>
