@@ -16,7 +16,7 @@ const HF_CHAT_ENDPOINT = HF_SPACE_URL + "/chat";
 
 // Middlewares essenciais
 app.use(cors()); // Permite que seu front-end (de qualquer origem) chame este proxy
-app.use(express.json()); // Permite que o servidor entenda o JSON enviado pelo front-end
+app.use(express.json({ limit: '20mb' })); // Permite que o servidor entenda o JSON enviado pelo front-end
 
 // Rota de "saúde" para verificar se o proxy está online
 app.get("/health", (req, res) => {
@@ -77,3 +77,4 @@ app.listen(PORT, () => {
   console.log(`Proxy J.A.D.E. rodando na porta ${PORT}.`);
   console.log(`Encaminhando requisições de /chat para ${HF_CHAT_ENDPOINT}`);
 });
+
