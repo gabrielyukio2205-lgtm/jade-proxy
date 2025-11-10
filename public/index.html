@@ -7,7 +7,7 @@
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap');
     :root { --bg:#0d1117; --surface:#161b22; --primary:#58a6ff; --text:#c9d1d9; --border:#30363d; }
-    body{font-family:'Fira Code',monospace;background:var(--bg);color:var(--text);margin:0;display:flex;justify-content:center;align-items:center;height:100vh}
+    body{font-family:'Fira+Code',monospace;background:var(--bg);color:var(--text);margin:0;display:flex;justify-content:center;align-items:center;height:100vh}
     #chat-container{width:90%;max-width:720px;height:80vh;background:var(--surface);border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;box-shadow:0 8px 24px rgba(0,0,0,.45)}
     #chat-header{padding:1rem;border-bottom:1px solid var(--border);font-weight:700;text-align:center}
     #chatbox{flex:1;padding:1rem;overflow-y:auto}
@@ -35,7 +35,6 @@
       <button id="sendBtn">Enviar</button>
     </div>
   </div>
-  <!-- O PLAYER DE ÁUDIO INVISÍVEL -->
   <audio id="audioPlayer" style="display: none;"></audio>
 
 <script>
@@ -45,57 +44,56 @@ const userInput = document.getElementById('userInput');
 const sendBtn = document.getElementById('sendBtn');
 const imageInput = document.getElementById('imageInput');
 const imageBtn = document.getElementById('imageBtn');
-const audioPlayer = document.getElementById('audioPlayer'); // Captura o player
+const audioPlayer = document.getElementById('audioPlayer');
 
 imageBtn.addEventListener('click', () => imageInput.click());
-imageInput.addEventListener('change', () => {
-    if (imageInput.files.length > 0) { appendMessage('Sistema', `Imagem "${imageInput.files[0].name}" selecionada. Envie uma mensagem para processá-la.`); }
-});
+imageInput.addEventListener('change', () => { if (imageInput.files.length > 0) { appendMessage('Sistema', `Imagem "${imageInput.files[0].name}" selecionada.`); }});
 
-function appendMessage(sender, text){ /* ... (sem alterações) ... */ }
-function escapeHtml(s){ /* ... (sem alterações) ... */ }
-function fileToBase64(file) { /* ... (sem alterações) ... */ }
+function appendMessage(sender, text){
+  const senderClass = sender === 'Você' ? 'user' : 'bot';
+  const el = document.createElement('div');
+  el.className = `message ${senderClass}`;
+  el.innerHTML = `<div class="sender ${senderClass}">${sender}</div><div class="text">${escapeHtml(text)}</div>`;
+  chatbox.appendChild(el);
+  chatbox.scrollTop = chatbox.scrollHeight;
+}
+function escapeHtml(s){ return s.replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[ch])); }
+function fileToBase64(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result); reader.onerror = error => reject(error); }); }
 
 async function sendMessage(){
   const message = userInput.value.trim();
   let image_base64 = null;
   if (!message && imageInput.files.length === 0) return;
-  if (imageInput.files.length > 0) {
-      appendMessage('Você', `${message || ''} [Imagem Anexada]`);
-      image_base64 = await fileToBase64(imageInput.files[0]);
-      imageInput.value = '';
-  } else { appendMessage('Você', message); }
+  if (imageInput.files.length > 0) { appendMessage('Você', `${message || ''} [Imagem Anexada]`); image_base64 = await fileToBase64(imageInput.files[0]); imageInput.value = ''; } else { appendMessage('Você', message); }
   userInput.value = '';
 
   try {
     appendMessage('J.A.D.E.', 'Processando...');
     const jadeThinkingMessage = chatbox.lastElementChild;
-    const resp = await fetch(API_URL, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ user_input: message, image_base64: image_base64 })
-    });
-
+    const resp = await fetch(API_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ user_input: message, image_base64: image_base64 }) });
     if (!resp.ok) throw new Error('HTTP '+resp.status);
     const json = await resp.json();
     
-    let botResponse = "[Resposta inesperada]";
+    let botResponse; // Declarada sem valor inicial
+
     if (json.success) {
-        botResponse = json.bot_response;
-        // LÓGICA PARA TOCAR O ÁUDIO!
+        botResponse = json.bot_response; // Pega o valor da API
         if (json.audio_base64) {
             audioPlayer.src = `data:audio/mpeg;base64,${json.audio_base64}`;
             audioPlayer.play();
         }
     } else { botResponse = `[Erro: ${json.error || 'Desconhecido'}]`; }
     
+    // A SALVAGUARDA: Se botResponse for undefined, mostramos uma mensagem clara.
+    if (botResponse === undefined) {
+        botResponse = "[Erro de comunicação: O texto da resposta não foi encontrado.]";
+    }
+    
     jadeThinkingMessage.querySelector('.text').innerHTML = escapeHtml(botResponse);
   } catch (err) {
     console.error(err);
     const thinkingMsg = chatbox.querySelector('.message:last-child .text');
-    if(thinkingMsg && thinkingMsg.textContent === 'Processando...'){
-      thinkingMsg.parentElement.parentElement.innerHTML = `<div class="sender">Erro do Sistema</div><div class="text">Falha ao conectar com J.A.D.E.</div>`;
-    }
+    if(thinkingMsg && thinkingMsg.textContent === 'Processando...'){ thinkingMsg.parentElement.parentElement.innerHTML = `<div class="sender">Erro do Sistema</div><div class="text">Falha ao conectar com J.A.D.E.</div>`; }
   }
 }
 
