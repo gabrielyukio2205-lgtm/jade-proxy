@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>J.A.D.E. - Portfólio Interativo</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap');
+    :root { --bg:#0d1117; --surface:#161b22; --primary:#58a6ff; --text:#c9d1d9; --border:#30363d; }
+    body{font-family:'Fira Code',monospace;background:var(--bg);color:var(--text);margin:0;display:flex;justify-content:center;align-items:center;height:100vh}
+    #chat-container{width:90%;max-width:720px;height:80vh;background:var(--surface);border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;box-shadow:0 8px 24px rgba(0,0,0,.45)}
+    #chat-header{padding:1rem;border-bottom:1px solid var(--border);font-weight:700;text-align:center}
+    #chatbox{flex:1;padding:1rem;overflow-y:auto}
+    .message{margin-bottom:1rem;display:flex;flex-direction:column}
+    .sender{font-size:.78rem;color:#8b949e;margin-bottom:.25rem}
+    .sender.user{color:var(--primary);align-self:flex-end}
+    .text{background:var(--bg);padding:.75rem;border-radius:6px;max-width:80%;word-wrap:break-word}
+    .user .text{background:#212c42;align-self:flex-end}
+    #input-area{display:flex;padding:1rem;border-top:1px solid var(--border)}
+    #userInput{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:.75rem;color:var(--text);font-family:inherit}
+    button{margin-left:10px;background:var(--primary);color:#042033;border:none;border-radius:6px;padding:0 .9rem;cursor:pointer;font-weight:700}
+  </style>
+</head>
+<body>
+  <div id="chat-container">
+    <div id="chat-header">J.A.D.E. <span>//</span> Ativa</div>
+    <div id="chatbox">
+      <div class="message bot"><div class="sender">J.A.D.E.</div><div class="text">Sistema online. Aguardando seu comando.</div></div>
+    </div>
+    <div id="input-area">
+      <input id="userInput" placeholder="Digite sua mensagem..." autocomplete="off"/>
+      <button id="sendBtn">Enviar</button>
+    </div>
+  </div>
+
+<script>
+const API_URL = '/api/predict';
+const chatbox = document.getElementById('chatbox');
+const userInput = document.getElementById('userInput');
+const sendBtn = document.getElementById('sendBtn');
+
+function appendMessage(sender, text){
+  const senderClass = sender === 'Você' ? 'user' : 'bot';
+  const el = document.createElement('div');
+  el.className = `message ${senderClass}`;
+  el.innerHTML = `<div class="sender ${senderClass}">${sender}</div><div class="text">${escapeHtml(text)}</div>`;
+  chatbox.appendChild(el);
+  chatbox.scrollTop = chatbox.scrollHeight;
+}
+function escapeHtml(s){ return s.replace(/[&<>"']/g, ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[ch])); }
+
+async function sendMessage(message){
+  appendMessage('Você', message);
+  userInput.value = '';
+  try {
+    const resp = await fetch(API_URL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ data: [message, null, null, [] ], fn_index: 0 })
+    });
+    if (!resp.ok) throw new Error('HTTP '+resp.status);
+    const json = await resp.json();
+    // tenta extrair de forma segura
+    let bot = null;
+    if (json?.data && Array.isArray(json.data) && json.data[0]) {
+      const hist = json.data[0];
+      if (Array.isArray(hist) && hist.length>0) {
+        const last = hist[hist.length-1];
+        bot = Array.isArray(last) ? last[1] : String(last);
+      } else if (typeof hist === 'string') bot = hist;
+    }
+    if (!bot && typeof json === 'string') bot = json;
+    if (!bot) bot = '[Resposta em formato inesperado]';
+    appendMessage('J.A.D.E.', bot);
+  } catch (err) {
+    console.error(err);
+    appendMessage('Erro do Sistema', 'Falha ao conectar com J.A.D.E.');
+  }
+}
+
+sendBtn.addEventListener('click', ()=>{ const m=userInput.value.trim(); if(m) sendMessage(m); });
+userInput.addEventListener('keydown', e=>{ if(e.key==='Enter'){ const m=userInput.value.trim(); if(m) sendMessage(m); }});
+</script>
+</body>
+</html>
