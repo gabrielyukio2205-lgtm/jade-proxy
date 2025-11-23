@@ -1,5 +1,5 @@
-// server.js - Proxy J.A.D.E. v2.1
-// Aprimorado para aceitar payloads maiores para imagens e áudios.
+// server.js - Proxy J.A.D.E. v3.0 (Universal)
+// Agora suporta Chat, Code e Scholar automaticamente!
 
 import express from "express";
 import fetch from "node-fetch";
@@ -8,62 +8,85 @@ import cors from "cors";
 const app = express();
 const PORT = process.env.PORT || 10000;
 
+// URL base do seu Hugging Face Space (Backend Real)
 const HF_SPACE_URL = "https://madras1-jade-port.hf.space";
-const HF_CHAT_ENDPOINT = HF_SPACE_URL + "/chat";
 
 app.use(cors());
 
-// A CHAVE MESTRA: Aumentamos o limite do corpo da requisição JSON para 20 megabytes.
-// Isso conserta o erro "Falha ao conectar" para imagens e permite o envio de áudio.
-app.use(express.json({ limit: '20mb' }));
+// Aumentamos o limite para aceitar imagens grandes e áudios
+app.use(express.json({ limit: '50mb' })); // Aumentei pra 50MB pra garantir ;)
 
-// Rota de saúde para verificar se o proxy está online
+// Rota de saúde
 app.get("/health", (req, res) => {
-  res.status(200).json({ 
-    status: "online", 
-    target_api: HF_CHAT_ENDPOINT 
-  });
+  res.status(200).json({ status: "online", target: HF_SPACE_URL });
 });
 
-// A rota principal que encaminha TUDO para o Space
-app.post("/chat", async (req, res) => {
-  const { user_input, image_base64 } = req.body;
-  const hasImage = image_base64 ? "Sim" : "Não";
-  const log_input = user_input || "[Apenas Imagem]";
-  console.log(`Proxy: Recebida requisição. Input: "${log_input}", Imagem: ${hasImage}`);
+// Rota Raiz (apenas visual)
+app.get("/", (req, res) => {
+  res.send(`
+    <style>body{font-family:sans-serif;background:#111;color:#eee;display:flex;justify-content:center;align-items:center;height:100vh;}</style>
+    <div style="text-align:center">
+      <h1>💎 Proxy J.A.D.E. Universal</h1>
+      <p style="color:#4ade80">Status: Operacional</p>
+      <p>Redirecionando tráfego para: <b>${HF_SPACE_URL}</b></p>
+    </div>
+  `);
+});
+
+// ==================================================================
+// 🔄 O CORAÇÃO DO PROXY UNIVERSAL
+// Captura qualquer método (GET, POST) em qualquer rota (*)
+// e repassa exatamente igual para o Hugging Face.
+// ==================================================================
+app.all("*", async (req, res) => {
+  // Ignora a raiz e health check que já tratamos acima
+  if (req.path === "/" || req.path === "/health") return;
+
+  const targetUrl = HF_SPACE_URL + req.path;
+  const method = req.method;
+
+  console.log(`➡️ [Proxy] Encaminhando ${method}: ${req.path} -> ${targetUrl}`);
 
   try {
-    const headers = { "Content-Type": "application/json" };
-    if (process.env.HF_TOKEN) {
-      headers["Authorization"] = `Bearer ${process.env.HF_TOKEN}`;
+    const headers = { 
+      "Content-Type": "application/json" 
+    };
+    
+    // Se você tiver token privado no futuro, descomente abaixo:
+    // if (process.env.HF_TOKEN) headers["Authorization"] = `Bearer ${process.env.HF_TOKEN}`;
+
+    // Configuração da requisição para o HF
+    const fetchOptions = {
+      method: method,
+      headers: headers,
+    };
+
+    // Só anexa o corpo se não for GET ou HEAD (GET com corpo dá erro)
+    if (method !== "GET" && method !== "HEAD") {
+      fetchOptions.body = JSON.stringify(req.body);
     }
 
-    const spaceResponse = await fetch(HF_CHAT_ENDPOINT, {
-      method: "POST",
-      headers: headers,
-      body: JSON.stringify(req.body), // Encaminha o corpo inteiro como recebido
-    });
+    // Faz a chamada real
+    const hfResponse = await fetch(targetUrl, fetchOptions);
+    
+    // Tenta pegar o JSON da resposta
+    // Se o backend devolver áudio binário ou arquivo, precisamos tratar diferente,
+    // mas por enquanto, como seu app.py devolve JSON (com base64 dentro), isso funciona.
+    const data = await hfResponse.json();
 
-    const responseData = await spaceResponse.json();
-    console.log("Proxy: Resposta recebida do Space.");
-
-    res.status(spaceResponse.status).json(responseData);
+    console.log(`⬅️ [Proxy] Resposta recebida do Space: ${hfResponse.status}`);
+    res.status(hfResponse.status).json(data);
 
   } catch (err) {
-    console.error(`Proxy: Erro crítico ao contatar o Space.`, err);
-    res.status(502).json({ 
+    console.error(`❌ [Proxy Erro]:`, err);
+    res.status(500).json({ 
       success: false, 
-      error: "Bad Gateway: O proxy não conseguiu se comunicar com a API da J.A.D.E." 
+      error: "Erro de comunicação no Proxy.", 
+      details: err.message 
     });
   }
 });
 
-// Rota raiz para uma mensagem de boas-vindas
-app.get("/", (req, res) => {
-  res.send(`<html><body><h2>Proxy J.A.D.E. está ativo.</h2><p>Faça requisições POST para o endpoint /chat.</p></body></html>`);
-});
-
 app.listen(PORT, () => {
-  console.log(`Proxy J.A.D.E. rodando na porta ${PORT}.`);
-  console.log(`Encaminhando requisições de /chat para ${HF_CHAT_ENDPOINT}`);
+  console.log(`🚀 Proxy J.A.D.E. Universal rodando na porta ${PORT}`);
 });
